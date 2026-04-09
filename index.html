@@ -163,6 +163,16 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
     </div>
     <button class="btn btn-primary btn-block" onclick="addItem()">+ Kart Ekle</button>
   </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:10px">Dışa / İçe Aktar</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="exportJSON()" style="flex:1;min-width:100px">⬇ JSON İndir</button>
+      <button class="btn btn-sm" onclick="triggerImport('merge')" style="flex:1;min-width:100px">⬆ Ekle</button>
+      <button class="btn btn-sm btn-danger-outline" onclick="triggerImport('overwrite')" style="flex:1;min-width:100px">⬆ Üzerine Yaz</button>
+    </div>
+    <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="handleImport(event)">
+    <div id="import-msg" style="font-size:12px;margin-top:8px;display:none;padding:6px 10px;border-radius:6px"></div>
+  </div>
   <div id="item-count-label" class="item-count" style="display:none"></div>
   <div class="items-list" id="items-list"></div>
   <div class="empty-state" id="empty-msg">
@@ -581,6 +591,73 @@ function renderEval(f) {
       bar.style.width = bar.dataset.w + '%';
     });
   });
+}
+
+// --- EXPORT / IMPORT ---
+function exportJSON() {
+  if (!items.length) { showImportMsg('Dışa aktarılacak kart yok.', false); return; }
+  const data = JSON.stringify(items.map(i => ({ val: i.val, ans: i.ans })), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kartlar.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+}
+
+let importMode = 'merge';
+
+function triggerImport(mode) {
+  importMode = mode;
+  const inp = document.getElementById('import-file');
+  inp.value = '';
+  inp.click();
+}
+
+function handleImport(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let parsed = JSON.parse(e.target.result);
+      if (!Array.isArray(parsed)) throw new Error('Dizi bekleniyor');
+      const valid = parsed.filter(i => i && typeof i.val === 'string' && typeof i.ans === 'string' && i.val.trim() && i.ans.trim());
+      if (!valid.length) throw new Error('Geçerli kart bulunamadı');
+      const newItems = valid.map(i => ({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+        val: i.val.trim(),
+        ans: i.ans.trim()
+      }));
+      if (importMode === 'overwrite') {
+        if (!confirm(valid.length + ' kart yüklenecek, mevcut ' + items.length + ' kart silinecek. Emin misin?')) return;
+        items = newItems;
+        showImportMsg(valid.length + ' kart yüklendi (üzerine yazıldı).', true);
+      } else {
+        const existingKeys = new Set(items.map(i => i.val.toLowerCase() + '||' + i.ans.toLowerCase()));
+        const toAdd = newItems.filter(i => !existingKeys.has(i.val.toLowerCase() + '||' + i.ans.toLowerCase()));
+        items = [...items, ...toAdd];
+        showImportMsg(toAdd.length + ' yeni kart eklendi' + (valid.length - toAdd.length > 0 ? ', ' + (valid.length - toAdd.length) + ' tekrar atlandı.' : '.'), true);
+      }
+      saveItems();
+      renderList();
+    } catch(err) {
+      showImportMsg('Hata: Geçersiz JSON dosyası.', false);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showImportMsg(msg, ok) {
+  const el = document.getElementById('import-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = ok ? 'var(--success-light)' : 'var(--danger-light)';
+  el.style.color = ok ? 'var(--success)' : 'var(--danger)';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
 }
 
 // --- YARDIMCI ---
