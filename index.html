@@ -10,7 +10,7 @@
 <meta name="description" content="Kişisel flashcard ve test uygulaması">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Etch</title>
+<title>FlashCard</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -85,7 +85,7 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
 .item-count{font-size:13px;color:var(--text3);margin-bottom:12px}
 
 /* Flashcard */
-#fc-progress{font-size:13px;color:var(--text2);margin-bottom:12px;text-align:center;font-weight:500}
+#fc-progress{font-size:13px;color:var(--text2);text-align:center;font-weight:500}
 .flip-container{width:100%;margin-bottom:20px;cursor:pointer;perspective:1000px;flex-shrink:0}
 .flip-inner{width:100%;min-height:240px;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,0,.2,1);position:relative}
 .flip-inner.flipped{transform:rotateY(180deg)}
@@ -114,7 +114,7 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
 .score-err{background:var(--danger-light);color:var(--danger)}
 
 /* Test */
-#test-progress{font-size:13px;color:var(--text2);text-align:center;margin-bottom:12px;font-weight:500}
+#test-progress{font-size:13px;color:var(--text2);text-align:center;font-weight:500}
 #test-question{font-size:20px;font-weight:500;text-align:center;margin-bottom:20px;padding:28px 20px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);line-height:1.4;color:var(--text)}
 .test-options{display:flex;flex-direction:column;gap:10px}
 .test-opt{padding:14px 16px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg);font-size:15px;cursor:pointer;text-align:left;color:var(--text);transition:background .15s,border-color .15s,color .15s,opacity .15s;line-height:1.4;font-family:inherit;font-weight:400}
@@ -173,7 +173,10 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
 
 <!-- FLASHCARD SAYFASI -->
 <div class="page" id="page-fc">
-  <div id="fc-progress"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div id="fc-progress" style="margin-bottom:0"></div>
+    <button class="btn btn-sm" id="fc-reverse-btn" onclick="toggleReverse('fc')" style="font-size:12px;padding:5px 10px;gap:4px">⇄ Ters</button>
+  </div>
   <div class="flip-container" id="flip-container" onclick="flipCard()">
     <div class="flip-inner" id="flip-inner">
       <div class="flip-face flip-front">
@@ -210,7 +213,10 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
 
 <!-- TEST SAYFASI -->
 <div class="page" id="page-test">
-  <div id="test-progress"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div id="test-progress" style="margin-bottom:0"></div>
+    <button class="btn btn-sm" id="test-reverse-btn" onclick="toggleReverse('test')" style="font-size:12px;padding:5px 10px;gap:4px">⇄ Ters</button>
+  </div>
   <div id="test-question"></div>
   <div class="test-options" id="test-options"></div>
   <div class="test-done" id="test-done">
@@ -264,6 +270,17 @@ h2{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--text)}
 // --- VERİ ---
 let items = [];
 let stats = {};
+let reversed = { fc: false, test: false };
+
+function toggleReverse(mode) {
+  reversed[mode] = !reversed[mode];
+  const btn = document.getElementById(mode + '-reverse-btn');
+  btn.style.background = reversed[mode] ? 'var(--primary)' : '';
+  btn.style.color = reversed[mode] ? '#fff' : '';
+  btn.style.borderColor = reversed[mode] ? 'var(--primary)' : '';
+  if (mode === 'fc') startFC();
+  else startTest();
+}
 
 function load() {
   try { items = JSON.parse(localStorage.getItem('fc_items') || '[]'); } catch(e) { items = []; }
@@ -372,8 +389,14 @@ function startFC() {
 function showFC() {
   if (fcIdx >= fcQueue.length) { endFC(); return; }
   const it = fcQueue[fcIdx];
-  document.getElementById('fc-front-text').textContent = it.val;
-  document.getElementById('fc-back-text').textContent = it.ans;
+  const q = reversed.fc ? it.ans : it.val;
+  const a = reversed.fc ? it.val : it.ans;
+  const qLabel = reversed.fc ? 'Cevap' : 'Değer';
+  const aLabel = reversed.fc ? 'Değer' : 'Cevap';
+  document.getElementById('fc-front-text').textContent = q;
+  document.getElementById('fc-back-text').textContent = a;
+  document.querySelector('.flip-front .flip-label').textContent = qLabel;
+  document.querySelector('.flip-back .flip-label').textContent = aLabel;
   document.getElementById('fc-progress').textContent = (fcIdx + 1) + ' / ' + fcQueue.length;
   fcFlipped = false;
   document.getElementById('flip-inner').classList.remove('flipped');
@@ -449,23 +472,26 @@ function showTest() {
   if (testIdx >= testQueue.length) { endTest(); return; }
   testAnswered = false;
   const it = testQueue[testIdx];
+  const q = reversed.test ? it.ans : it.val;
+  const correctOpt = reversed.test ? it.val : it.ans;
   document.getElementById('test-progress').textContent = (testIdx + 1) + ' / ' + testQueue.length;
-  document.getElementById('test-question').textContent = it.val;
+  document.getElementById('test-question').textContent = q;
 
   const wrongs = shuffle(items.filter(i => i.id !== it.id));
-  const opts = shuffle([it, ...wrongs.slice(0, 3)]);
+  const wrongOpts = wrongs.slice(0, 3).map(i => reversed.test ? i.val : i.ans);
+  const opts = shuffle([correctOpt, ...wrongOpts]);
   const el = document.getElementById('test-options');
   el.innerHTML = '';
   opts.forEach(opt => {
     const b = document.createElement('button');
     b.className = 'test-opt';
-    b.textContent = opt.ans;
-    b.onclick = () => answerTest(b, opt.id === it.id, it.id);
+    b.textContent = opt;
+    b.onclick = () => answerTest(b, opt === correctOpt, it.id, correctOpt);
     el.appendChild(b);
   });
 }
 
-function answerTest(btn, correct, itemId) {
+function answerTest(btn, correct, itemId, correctOpt) {
   if (testAnswered) return;
   testAnswered = true;
   const opts = document.querySelectorAll('.test-opt');
@@ -477,8 +503,7 @@ function answerTest(btn, correct, itemId) {
     btn.classList.add('wrong');
     testErr++;
     recordStat(itemId, 'test', false);
-    const correctAns = testQueue[testIdx].ans;
-    opts.forEach(b => { if (b.textContent === correctAns) b.classList.add('reveal-correct'); });
+    opts.forEach(b => { if (b.textContent === correctOpt) b.classList.add('reveal-correct'); });
   }
   opts.forEach(b => { if (!b.classList.contains('correct') && !b.classList.contains('wrong') && !b.classList.contains('reveal-correct')) b.classList.add('dimmed'); });
   setTimeout(() => { testIdx++; showTest(); }, 1500);
