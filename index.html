@@ -403,13 +403,7 @@ function showFC() {
   const a = reversed.fc ? it.val : it.ans;
   const qLabel = reversed.fc ? 'Cevap' : 'Değer';
   const aLabel = reversed.fc ? 'Değer' : 'Cevap';
-  document.getElementById('fc-front-text').textContent = q;
-  document.getElementById('fc-back-text').textContent = a;
-  document.querySelector('.flip-front .flip-label').textContent = qLabel;
-  document.querySelector('.flip-back .flip-label').textContent = aLabel;
-  document.getElementById('fc-progress').textContent = (fcIdx + 1) + ' / ' + fcQueue.length;
   fcFlipped = false;
-  document.getElementById('flip-inner').classList.remove('flipped');
   document.getElementById('fc-actions').classList.remove('visible');
   const timer = document.getElementById('fc-timer');
   const bar = document.getElementById('fc-timer-bar');
@@ -417,6 +411,27 @@ function showFC() {
   bar.style.transition = 'none';
   bar.style.width = '100%';
   clearTimeout(fcTimer);
+
+  const inner = document.getElementById('flip-inner');
+  const wasFlipped = inner.classList.contains('flipped');
+
+  function applyContent() {
+    document.getElementById('fc-front-text').textContent = q;
+    document.getElementById('fc-back-text').textContent = a;
+    document.querySelector('.flip-front .flip-label').textContent = qLabel;
+    document.querySelector('.flip-back .flip-label').textContent = aLabel;
+    document.getElementById('fc-progress').textContent = (fcIdx + 1) + ' / ' + fcQueue.length;
+  }
+
+  if (wasFlipped) {
+    inner.classList.remove('flipped');
+    inner.addEventListener('transitionend', function handler() {
+      inner.removeEventListener('transitionend', handler);
+      applyContent();
+    });
+  } else {
+    applyContent();
+  }
 }
 
 function flipCard() {
